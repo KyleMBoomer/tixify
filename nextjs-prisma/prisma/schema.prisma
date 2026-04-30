@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String?
+  spotifyId         String?  @unique
+  spotifyAccessToken String?
+  spotifyRefreshToken String?
+  tokenExpiresAt    DateTime?
+  location          String?  // City or coordinates
+  latitude          Float?
+  longitude         Float?
+  radius            Int      @default(50) // Search radius in miles/km
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+//Relations
+artists             UserArtist[]
+sentFriendRequests  Friendship[] @relation("RequestSender")
+receivedFriendRequests Friendship[] @relation("RequestReceiver")
+notifications       Notification[]
+eventInterests      EventInterest[]
+}
+
+model Artist {
+  id    String  @id // Spotify Artist ID
+  name  String
+  spotifyUrl  String?
+  imageUrl   String?
+  genres    String[]
+  popularity  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  //Relations 
+  users   UserArtist[]
+  events  Event[]
+}
+
+model UserArtist {
+  id String @id @default(cuid())
+  userId String 
+  artistId String
+  ranking Int? 
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, artistId])
+  @@index([userId])
+  @@index([artistId])
+}
+
+model Friendship {
+  id String @id @default(cuid())
+  senderId String
+  receiverId String
+  status FriendshipStatus @default(PENDING) // pending, accepted, rejected
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sender User @relation("RequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("RequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+enum FriendshipStatus {
+  PENDING 
+  ACCEPTED 
+  REJECTED 
+  BLOCKED
+}
+
+model Event {
+  id String @id // Ticketmaster event ID
+  name String
+  date DateTime
+  venue String
+  city String
+  state String?
+  country String
+  latitude Float?
+  longitude Float?
+  ticketmasterUrl String?
+  imageUrl String?
+  priceMin Float?
+  priceMax Float?
+  currency String?
+  artistIds String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  //Relations
+  artists Artist[]
+  notifications Notification[]
+  interests EventInterest[]
+
+  @@index([date])
+  @@index([city])
+}
+
+model Notification {
+  id String @id @default(cuid())
+  userId String
+  eventId String
+  friendIds String[] // IDs of friends who are also interested
+  message String
+  isRead Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([eventId])
+  @@index([createdAt])
+}
+
+model EventInterest {
+  id String @id @default(cuid())
+  userId String
+  eventId String
+  createdAt DateTime @default(now())
+  status InterestStatus @default(INTERESTED)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete:Cascade)
+
+  @@unique([userId, eventId])
+}
+
+enum InterestStatus {
+  INTERESTED
+  GOING
+  NOT_INTERESTED
+}
