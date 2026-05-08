@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': 'Basic' + Buffer.from(
+            'Authorization': 'Basic ' + Buffer.from(
                 process.env.SPOTIFY_CLIENT_ID + ':' + process.env.SPOTIFY_CLIENT_SECRET
             ).toString('base64')
         },
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         update: {
             spotifyAccessToken: tokens.access_token,
             spotifyRefreshToken: tokens.refresh_token,
-            spotifyTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+            tokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
         },
         create: {
             email: profile.email,
@@ -54,10 +54,10 @@ export async function GET(request: NextRequest) {
             spotifyId: profile.id,
             spotifyAccessToken: tokens.access_token,
             spotifyRefreshToken: tokens.refresh_token,
-            spotifyTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+            tokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
         }
     });
 
-    return NextResponse.redirect('/dashboard');
+    return NextResponse.redirect(new URL('/dashboard', request.url));
 }
  
