@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
     AUTH_URL: 'http://127.0.0.1:3000',
     NEXTAUTH_URL: 'http://127.0.0.1:3000',
   },
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'i.scdn.co' },
+      { protocol: 'https', hostname: 'mosaic.scdn.co' },
+    ],
+  },
 };
 
 export default nextConfig;
