@@ -9,18 +9,20 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  spotifyId String?  @unique
-  location  String? // City or coordinates
-  latitude  Float?
-  longitude Float?
-  radius    Int      @default(50) // Search radius in miles/km
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  accounts  Account[]
-  sessions  Session[]
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  spotifyId     String?   @unique
+  location      String? // City or coordinates
+  latitude      Float?
+  longitude     Float?
+  radius        Int       @default(50) // Search radius in miles/km
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
 
   //Relations
   artists                UserArtist[]
