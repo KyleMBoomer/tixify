@@ -61,3 +61,39 @@ export async function fetchTopArtists(accessToken: string): Promise<SpotifyArtis
   if (data.error) throw new Error(data.error.message);
   return data.items as SpotifyArtist[];
 }
+
+export async function syncUserTopArtists(userId: string) {
+  const accessToken = await getSpotifyAccessToken(userId);
+  if (!accessToken) throw new Error('Spotify token unavailable');
+
+  const spotifyArtists = await fetchTopArtists(accessToken);
+
+  for (let i = 0; i < spotifyArtists.length; i++) {
+    const a = spotifyArtists[i];
+    const fields = {
+      name: a.name,
+      spotifyUrl: a.external_urls.spotify,
+      imageUrl: a.images[0]?.url ?? null,
+      genres: a.genres,
+      popularity: a.popularity,
+    };
+
+    await prisma.artist.upsert({
+      where: { id: a.id },
+      update: fields,
+      create: { id: a.id, ...fields },
+    });
+
+    await prisma.userArtist.upsert({
+      where: { userId_artistId: { userId, artistId: a.id } },
+      update: { ranking: i + 1 },
+      create: { userId, artistId: a.id, ranking: i + 1 },
+    });
+  }
+
+  return prisma.userArtist.findMany({
+    where: { userId },
+    include: { artist: true },
+    orderBy: { ranking: 'asc' },
+  });
+}
