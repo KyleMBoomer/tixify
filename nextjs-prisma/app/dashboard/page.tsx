@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import { auth, signOut } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { fetchSpotifyProfile, getSpotifyAccessToken, syncUserTopArtists } from '@/lib/spotify';
+import { syncUserProduct, syncUserTopArtists } from '@/lib/spotify';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { ArtistTile } from '@/components/ArtistTile';
@@ -28,16 +28,25 @@ export default async function DashboardPage() {
 
   // Decide whether to mount the Web Playback SDK. Free / open accounts
   // get the existing external-link tiles; premium gets in-app playback.
-  let isPremium = false;
-  const accessToken = await getSpotifyAccessToken(session.user.id);
-  if (accessToken) {
+  // Read `product` from the cached column. If null (user predates the
+  // linkAccount event handler, or that handler failed), populate it
+  // lazily — runs at most once per user.
+  let product = (
+    await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { product: true },
+    })
+  )?.product ?? null;
+
+  if (product == null) {
     try {
-      const profile = await fetchSpotifyProfile(accessToken);
-      isPremium = profile.product === 'premium';
+      product = await syncUserProduct(session.user.id);
     } catch (err) {
-      console.error('[dashboard] profile fetch failed', err);
+      console.error('[dashboard] lazy syncUserProduct failed', err);
     }
   }
+
+  const isPremium = product === 'premium';
 
   const body = (
     <main className="min-h-screen bg-zinc-50 dark:bg-black">
@@ -83,7 +92,14 @@ export default async function DashboardPage() {
             action={async () => {
               'use server';
               const s = await auth();
-              if (s?.user?.id) await syncUserTopArtists(s.user.id);
+              if (s?.user?.id) {
+                await Promise.all([
+                  syncUserTopArtists(s.user.id),
+                  syncUserProduct(s.user.id).catch((err) =>
+                    console.error('[dashboard refresh] syncUserProduct failed', err),
+                  ),
+                ]);
+              }
               revalidatePath('/dashboard');
             }}
           >
