@@ -1,9 +1,11 @@
 import Image from 'next/image';
 import { auth, signOut } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { syncUserTopArtists } from '@/lib/spotify';
+import { fetchSpotifyProfile, getSpotifyAccessToken, syncUserTopArtists } from '@/lib/spotify';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { ArtistTile } from '@/components/ArtistTile';
+import { SpotifyPlayerProvider } from '@/components/SpotifyPlayer';
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -24,7 +26,20 @@ export default async function DashboardPage() {
     }
   }
 
-  return (
+  // Decide whether to mount the Web Playback SDK. Free / open accounts
+  // get the existing external-link tiles; premium gets in-app playback.
+  let isPremium = false;
+  const accessToken = await getSpotifyAccessToken(session.user.id);
+  if (accessToken) {
+    try {
+      const profile = await fetchSpotifyProfile(accessToken);
+      isPremium = profile.product === 'premium';
+    } catch (err) {
+      console.error('[dashboard] profile fetch failed', err);
+    }
+  }
+
+  const body = (
     <main className="min-h-screen bg-zinc-50 dark:bg-black">
       <header className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-8 py-4">
         <div className="flex items-center gap-3">
@@ -95,37 +110,17 @@ export default async function DashboardPage() {
 
         <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
           {artists.map((ua) => (
-            <li key={ua.artist.id} className="flex flex-col gap-2">
-              <a
-                href={ua.artist.spotifyUrl ?? '#'}
-                target="_blank"
-                rel="noreferrer"
-                className="block"
-              >
-                {ua.artist.imageUrl ? (
-                  <Image
-                    src={ua.artist.imageUrl}
-                    alt={ua.artist.name}
-                    width={300}
-                    height={300}
-                    className="aspect-square w-full rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="aspect-square w-full rounded-lg bg-zinc-200 dark:bg-zinc-800" />
-                )}
-              </a>
-              <div>
-                <p className="font-semibold text-black dark:text-white truncate">
-                  {ua.ranking}. {ua.artist.name}
-                </p>
-                <p className="text-xs text-zinc-500 truncate">
-                  {ua.artist.genres.slice(0, 2).join(', ') || '—'}
-                </p>
-              </div>
-            </li>
+            <ArtistTile
+              key={ua.artist.id}
+              artist={ua.artist}
+              ranking={ua.ranking}
+              isPremium={isPremium}
+            />
           ))}
         </ul>
       </section>
     </main>
   );
+
+  return isPremium ? <SpotifyPlayerProvider>{body}</SpotifyPlayerProvider> : body;
 }
