@@ -53,6 +53,23 @@ export async function getSpotifyAccessToken(userId: string): Promise<string | nu
   return account.access_token;
 }
 
+export interface SpotifyProfile {
+  id: string;
+  display_name: string | null;
+  email: string;
+  product: 'premium' | 'free' | 'open';
+  country: string;
+}
+
+export async function fetchSpotifyProfile(accessToken: string): Promise<SpotifyProfile> {
+  const res = await fetch('https://api.spotify.com/v1/me', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message ?? 'Failed to fetch Spotify profile');
+  return data as SpotifyProfile;
+}
+
 export async function fetchTopArtists(accessToken: string): Promise<SpotifyArtist[]> {
   const res = await fetch('https://api.spotify.com/v1/me/top/artists?limit=50&time_range=medium_term', {
     headers: { Authorization: `Bearer ${accessToken}` },
