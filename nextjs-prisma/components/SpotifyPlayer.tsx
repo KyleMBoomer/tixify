@@ -27,6 +27,7 @@ import {
 type PlayerState = {
   isReady: boolean;
   isPaused: boolean;
+  shuffle: boolean;
   trackName: string | null;
   artistName: string | null;
   albumImageUrl: string | null;
@@ -35,6 +36,10 @@ type PlayerState = {
 type PlayerContextValue = PlayerState & {
   play: (contextUri: string) => Promise<void>;
   togglePlay: () => Promise<void>;
+  next: () => Promise<void>;
+  prev: () => Promise<void>;
+  restart: () => Promise<void>;
+  toggleShuffle: () => Promise<void>;
 };
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -62,6 +67,9 @@ type SpotifyPlayer = {
   connect: () => Promise<boolean>;
   disconnect: () => void;
   togglePlay: () => Promise<void>;
+  nextTrack: () => Promise<void>;
+  previousTrack: () => Promise<void>;
+  seek: (positionMs: number) => Promise<void>;
   addListener: (event: string, cb: (payload: any) => void) => void;
   removeListener: (event: string) => void;
 };
@@ -81,6 +89,7 @@ export function SpotifyPlayerProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PlayerState>({
     isReady: false,
     isPaused: true,
+    shuffle: false,
     trackName: null,
     artistName: null,
     albumImageUrl: null,
@@ -127,6 +136,7 @@ export function SpotifyPlayerProvider({ children }: { children: ReactNode }) {
       setState((prev) => ({
         ...prev,
         isPaused: s.paused,
+        shuffle: !!s.shuffle,
         trackName: track?.name ?? null,
         artistName: track?.artists?.map((a: any) => a.name).join(', ') ?? null,
         albumImageUrl: track?.album?.images?.[0]?.url ?? null,
@@ -167,8 +177,40 @@ export function SpotifyPlayerProvider({ children }: { children: ReactNode }) {
     await playerRef.current?.togglePlay();
   }, []);
 
+  const next = useCallback(async () => {
+    await playerRef.current?.nextTrack();
+  }, []);
+
+  // Spotify's `previousTrack` restarts the current track if you're more
+  // than ~3s in, and only steps to the actual previous track if called
+  // within the first few seconds. Use `restart` for unambiguous
+  // restart-from-beginning behavior.
+  const prev = useCallback(async () => {
+    await playerRef.current?.previousTrack();
+  }, []);
+
+  const restart = useCallback(async () => {
+    await playerRef.current?.seek(0);
+  }, []);
+
+  // Shuffle isn't on the SDK — it has to be set via the Web API. The
+  // resulting state change fires `player_state_changed`, which updates
+  // the cached `shuffle` boolean.
+  const toggleShuffle = useCallback(async () => {
+    const deviceId = deviceIdRef.current;
+    const token = tokenRef.current;
+    if (!deviceId || !token) return;
+    const nextShuffle = !state.shuffle;
+    await fetch(
+      `https://api.spotify.com/v1/me/player/shuffle?state=${nextShuffle}&device_id=${deviceId}`,
+      { method: 'PUT', headers: { Authorization: `Bearer ${token}` } },
+    );
+  }, [state.shuffle]);
+
   return (
-    <PlayerContext.Provider value={{ ...state, play, togglePlay }}>
+    <PlayerContext.Provider
+      value={{ ...state, play, togglePlay, next, prev, restart, toggleShuffle }}
+    >
       <Script src="https://sdk.scdn.co/spotify-player.js" strategy="afterInteractive" />
       {children}
       <PlayerBar />
@@ -177,7 +219,19 @@ export function SpotifyPlayerProvider({ children }: { children: ReactNode }) {
 }
 
 function PlayerBar() {
-  const { isReady, isPaused, trackName, artistName, albumImageUrl, togglePlay } = usePlayer();
+  const {
+    isReady,
+    isPaused,
+    shuffle,
+    trackName,
+    artistName,
+    albumImageUrl,
+    togglePlay,
+    next,
+    prev,
+    restart,
+    toggleShuffle,
+  } = usePlayer();
 
   if (!isReady || !trackName) return null;
 
@@ -191,13 +245,56 @@ function PlayerBar() {
         <p className="text-sm font-semibold text-black dark:text-white truncate">{trackName}</p>
         <p className="text-xs text-zinc-500 truncate">{artistName}</p>
       </div>
-      <button
-        type="button"
-        onClick={togglePlay}
-        className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
-      >
-        {isPaused ? 'Play' : 'Pause'}
-      </button>
+
+      <div className="flex items-center gap-2">
+        <ControlButton onClick={toggleShuffle} active={shuffle} label="Toggle shuffle">
+          Shuffle
+        </ControlButton>
+        <ControlButton onClick={prev} label="Previous track">
+          Prev
+        </ControlButton>
+        <ControlButton onClick={restart} label="Restart current track">
+          Replay
+        </ControlButton>
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
+        >
+          {isPaused ? 'Play' : 'Pause'}
+        </button>
+        <ControlButton onClick={next} label="Next track">
+          Next
+        </ControlButton>
+      </div>
     </div>
+  );
+}
+
+function ControlButton({
+  onClick,
+  active,
+  label,
+  children,
+}: {
+  onClick: () => void;
+  active?: boolean;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      className={`rounded-full px-3 py-2 text-sm font-semibold border ${
+        active
+          ? 'bg-[#1DB954] text-black border-transparent'
+          : 'border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
