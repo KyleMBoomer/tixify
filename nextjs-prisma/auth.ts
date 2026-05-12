@@ -3,6 +3,7 @@ import NextAuth, { type NextAuthConfig } from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import Spotify from 'next-auth/providers/spotify';
 import { prisma } from '@/lib/prisma';
+import { syncUserProduct } from '@/lib/spotify';
 
 console.log('[auth] process.env.AUTH_URL:', process.env.AUTH_URL);
 console.log('[auth] process.env.NEXTAUTH_URL:', process.env.NEXTAUTH_URL);
@@ -39,6 +40,20 @@ export const authConfig: NextAuthConfig = {
     async session({ session, user }) {
       session.user.id = user.id;
       return session;
+    },
+  },
+  events: {
+    // Fires after the Account row is inserted on first OAuth link.
+    // The access_token is on disk at this point, so syncUserProduct
+    // can fetch /v1/me and cache `product` once for the lifetime of
+    // the account. Errors here must not block sign-in.
+    async linkAccount({ user, account }) {
+      if (account.provider !== 'spotify' || !user.id) return;
+      try {
+        await syncUserProduct(user.id);
+      } catch (err) {
+        console.error('[auth] syncUserProduct on linkAccount failed', err);
+      }
     },
   },
 };
