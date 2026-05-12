@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tixify
 
-## Getting Started
+A concert-discovery app that pulls a user's top artists from Spotify and matches them against upcoming Ticketmaster events.
 
-First, run the development server:
+Stack: Next.js 16 (App Router), TypeScript, NextAuth v5 (Spotify provider), Prisma 6 + PostgreSQL, Tailwind v4.
+
+> **Status:** active development. Auth, Spotify/Ticketmaster sync, and a dashboard skeleton are in place. Friend management, notifications, and the full event-discovery UI are not yet built.
+
+## Prerequisites
+
+- Node.js (tested on 22.12.0 — note that Prisma 6 is pinned because Prisma 7 requires 20.19+ but is otherwise incompatible with this setup)
+- A PostgreSQL database (the dev DB is hosted on `db.prisma.io`, but any Postgres works)
+- A [Spotify developer app](https://developer.spotify.com/dashboard) with `http://127.0.0.1:3000/api/auth/callback/spotify` registered as a redirect URI
+- A [Ticketmaster Discovery API](https://developer.ticketmaster.com/) key
+
+## Setup
+
+All commands run from the `nextjs-prisma/` directory (the app does **not** live at the repo root).
+
+```bash
+cd nextjs-prisma
+npm install
+```
+
+### Environment variables
+
+Create `nextjs-prisma/.env` with:
+
+```bash
+DATABASE_URL=postgresql://...
+
+SPOTIFY_CLIENT_ID=...
+SPOTIFY_CLIENT_SECRET=...
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:3000/api/auth/callback/spotify
+
+TICKETMASTER_API_KEY=...
+TICKETMASTER_SECRET=...
+
+AUTH_URL=http://127.0.0.1:3000
+NEXTAUTH_URL=http://127.0.0.1:3000
+AUTH_SECRET=...        # generate with: npx auth secret
+```
+
+> **Use `127.0.0.1`, not `localhost`.** Spotify's redirect-URI policy (April 2025) rejects `http://localhost` at the token-exchange step. The dev script already binds Next to `127.0.0.1` — keep your env vars and Spotify dashboard entry on the same host.
+
+### Database
+
+Apply migrations and generate the Prisma client:
+
+```bash
+npx prisma migrate dev
+```
+
+(Optional) Seed the database with sample users, artists, and events:
+
+```bash
+npx tsx prisma/seed.ts
+```
+
+### Run the dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000) — again, not `localhost`. Sign in with Spotify, then visit `/dashboard`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Useful routes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `GET /api/user/me` — current session user
+- `GET /api/user/artists` — syncs and returns the user's top Spotify artists
+- `GET /api/events` — Ticketmaster event search
+- `POST /api/events/[id]/interest` — mark interest in an event
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`/dashboard/*` and `/api/user/*` require an authenticated session.
