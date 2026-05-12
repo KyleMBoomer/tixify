@@ -63,6 +63,18 @@ declare global {
   }
 }
 
+type SpotifyTrack = {
+  name: string;
+  artists: { name: string }[];
+  album: { images: { url: string }[] };
+};
+
+type SpotifyPlaybackState = {
+  paused: boolean;
+  shuffle: boolean;
+  track_window: { current_track: SpotifyTrack | null };
+};
+
 type SpotifyPlayer = {
   connect: () => Promise<boolean>;
   disconnect: () => void;
@@ -70,7 +82,14 @@ type SpotifyPlayer = {
   nextTrack: () => Promise<void>;
   previousTrack: () => Promise<void>;
   seek: (positionMs: number) => Promise<void>;
-  addListener: (event: string, cb: (payload: any) => void) => void;
+  addListener: {
+    (event: 'ready' | 'not_ready', cb: (payload: { device_id: string }) => void): void;
+    (
+      event: 'initialization_error' | 'authentication_error' | 'account_error',
+      cb: (payload: { message: string }) => void,
+    ): void;
+    (event: 'player_state_changed', cb: (state: SpotifyPlaybackState | null) => void): void;
+  };
   removeListener: (event: string) => void;
 };
 
@@ -130,7 +149,7 @@ export function SpotifyPlayerProvider({ children }: { children: ReactNode }) {
       console.error('[SpotifyPlayer] account error (Premium required?):', message),
     );
 
-    player.addListener('player_state_changed', (s: any) => {
+    player.addListener('player_state_changed', (s) => {
       if (!s) return;
       const track = s.track_window?.current_track;
       setState((prev) => ({
@@ -138,7 +157,7 @@ export function SpotifyPlayerProvider({ children }: { children: ReactNode }) {
         isPaused: s.paused,
         shuffle: !!s.shuffle,
         trackName: track?.name ?? null,
-        artistName: track?.artists?.map((a: any) => a.name).join(', ') ?? null,
+        artistName: track?.artists?.map((a) => a.name).join(', ') ?? null,
         albumImageUrl: track?.album?.images?.[0]?.url ?? null,
       }));
     });
