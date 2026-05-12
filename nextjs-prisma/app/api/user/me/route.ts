@@ -1,5 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
+import { fetchSpotifyProfile, getSpotifyAccessToken } from '@/lib/spotify';
 
 export async function GET() {
   const session = await auth();
@@ -28,5 +29,20 @@ export async function GET() {
 
   if (!user) return Response.json({ error: 'User not found' }, { status: 404 });
 
-  return Response.json(user);
+  // Spotify subscription tier — drives whether the dashboard can use
+  // the Web Playback SDK (`premium`) or has to fall back to external links.
+  let product: SpotifyProfile['product'] | null = null;
+  const accessToken = await getSpotifyAccessToken(session.user.id);
+  if (accessToken) {
+    try {
+      const profile = await fetchSpotifyProfile(accessToken);
+      product = profile.product;
+    } catch (err) {
+      console.error('[user/me] failed to fetch Spotify profile', err);
+    }
+  }
+
+  return Response.json({ ...user, product });
 }
+
+type SpotifyProfile = Awaited<ReturnType<typeof fetchSpotifyProfile>>;
