@@ -79,6 +79,17 @@ export async function fetchTopArtists(accessToken: string): Promise<SpotifyArtis
   return data.items as SpotifyArtist[];
 }
 
+export async function syncUserProduct(userId: string): Promise<string | null> {
+  const accessToken = await getSpotifyAccessToken(userId);
+  if (!accessToken) return null;
+  const profile = await fetchSpotifyProfile(accessToken);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { product: profile.product, productUpdatedAt: new Date() },
+  });
+  return profile.product;
+}
+
 export async function syncUserTopArtists(userId: string) {
   const accessToken = await getSpotifyAccessToken(userId);
   if (!accessToken) throw new Error('Spotify token unavailable');
