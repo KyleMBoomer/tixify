@@ -9,51 +9,52 @@ datasource db {
 }
 
 model User {
-  id                String   @id @default(cuid())
-  email             String   @unique
-  name              String?
-  spotifyId         String?  @unique
-  spotifyAccessToken String?
-  spotifyRefreshToken String?
-  tokenExpiresAt    DateTime?
-  location          String?  // City or coordinates
-  latitude          Float?
-  longitude         Float?
-  radius            Int      @default(50) // Search radius in miles/km
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  spotifyId     String?   @unique
+  location      String? // City or coordinates
+  latitude      Float?
+  longitude     Float?
+  radius        Int       @default(50) // Search radius in miles/km
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
 
-//Relations
-artists             UserArtist[]
-sentFriendRequests  Friendship[] @relation("RequestSender")
-receivedFriendRequests Friendship[] @relation("RequestReceiver")
-notifications       Notification[]
-eventInterests      EventInterest[]
+  //Relations
+  artists                UserArtist[]
+  sentFriendRequests     Friendship[]    @relation("RequestSender")
+  receivedFriendRequests Friendship[]    @relation("RequestReceiver")
+  notifications          Notification[]
+  eventInterests         EventInterest[]
 }
 
 model Artist {
-  id    String  @id // Spotify Artist ID
-  name  String
-  spotifyUrl  String?
+  id         String   @id // Spotify Artist ID
+  name       String
+  spotifyUrl String?
   imageUrl   String?
-  genres    String[]
-  popularity  Int?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  genres     String[]
+  popularity Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   //Relations 
-  users   UserArtist[]
-  events  Event[]
+  users  UserArtist[]
+  events Event[]
 }
 
 model UserArtist {
-  id String @id @default(cuid())
-  userId String 
-  artistId String
-  ranking Int? 
+  id        String   @id @default(cuid())
+  userId    String
+  artistId  String
+  ranking   Int?
   createdAt DateTime @default(now())
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
   @@unique([userId, artistId])
   @@index([userId])
@@ -61,14 +62,14 @@ model UserArtist {
 }
 
 model Friendship {
-  id String @id @default(cuid())
-  senderId String
+  id         String           @id @default(cuid())
+  senderId   String
   receiverId String
-  status FriendshipStatus @default(PENDING) // pending, accepted, rejected
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status     FriendshipStatus @default(PENDING) // pending, accepted, rejected
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
-  sender User @relation("RequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  sender   User @relation("RequestSender", fields: [senderId], references: [id], onDelete: Cascade)
   receiver User @relation("RequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@unique([senderId, receiverId])
@@ -77,51 +78,51 @@ model Friendship {
 }
 
 enum FriendshipStatus {
-  PENDING 
-  ACCEPTED 
-  REJECTED 
+  PENDING
+  ACCEPTED
+  REJECTED
   BLOCKED
 }
 
 model Event {
-  id String @id // Ticketmaster event ID
-  name String
-  date DateTime
-  venue String
-  city String
-  state String?
-  country String
-  latitude Float?
-  longitude Float?
+  id              String   @id // Ticketmaster event ID
+  name            String
+  date            DateTime
+  venue           String
+  city            String
+  state           String?
+  country         String
+  latitude        Float?
+  longitude       Float?
   ticketmasterUrl String?
-  imageUrl String?
-  priceMin Float?
-  priceMax Float?
-  currency String?
-  artistIds String[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  imageUrl        String?
+  priceMin        Float?
+  priceMax        Float?
+  currency        String?
+  artistIds       String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   //Relations
-  artists Artist[]
+  artists       Artist[]
   notifications Notification[]
-  interests EventInterest[]
+  interests     EventInterest[]
 
   @@index([date])
   @@index([city])
 }
 
 model Notification {
-  id String @id @default(cuid())
-  userId String
-  eventId String
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
   friendIds String[] // IDs of friends who are also interested
-  message String
-  isRead Boolean @default(false)
+  message   String
+  isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
@@ -130,14 +131,14 @@ model Notification {
 }
 
 model EventInterest {
-  id String @id @default(cuid())
-  userId String
-  eventId String
-  createdAt DateTime @default(now())
-  status InterestStatus @default(INTERESTED)
+  id        String         @id @default(cuid())
+  userId    String
+  eventId   String
+  createdAt DateTime       @default(now())
+  status    InterestStatus @default(INTERESTED)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  event Event @relation(fields: [eventId], references: [id], onDelete:Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([userId, eventId])
 }
@@ -146,4 +147,38 @@ enum InterestStatus {
   INTERESTED
   GOING
   NOT_INTERESTED
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
